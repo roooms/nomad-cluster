@@ -1,0 +1,14 @@
+# Specify a unique name as this is used for cluster naming
+cluster_name = "my-nomad-cluster"
+
+# Specify an AWS ssh key name to be installed on each instance
+ssh_key_name = "my-ssh-key"
+
+# Specify the region to use
+region = "eu-west-1"
+
+# Specify the VPC to use
+vpc_id = "vpc-abcd1234"
+
+# Specify a list of subnets the auto-scaling group will span
+subnet_ids = ["subnet-a1b2c3d4", "subnet-abcd1234", "subnet-1234abcd"]
