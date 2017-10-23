@@ -35,6 +35,9 @@ popd > /dev/null
 
 # configure nomad agent defaults
 cat > /etc/nomad.d/nomad-default.hcl <<EOF
+acl {
+  enabled = true
+}
 advertise {
   http = "$${local_ipv4}"
   rpc = "$${local_ipv4}"
@@ -153,3 +156,65 @@ EOF
 # start nomad-join
 systemctl enable nomad-join
 systemctl start nomad-join
+
+if [ "$${agent_type}" = "server" ]; then 
+  # install nomad-bootstrap
+  cat > /usr/local/bin/nomad-bootstrap <<EOS
+#!/bin/bash
+
+get_leader_http_code() {  
+  curl -w %{http_code} -s http://127.0.0.1:4646/v1/status/leader -o /dev/null
+}
+
+get_leader_ipv4() {
+  curl -s http://127.0.0.1:4646/v1/status/leader | jq -r . | cut -d: -f1
+}
+
+get_local_ipv4() {
+  curl -s http://169.254.169.254/latest/meta-data/local-ipv4
+}
+
+# get the HTTP response code from /v1/status/leader
+leader_http_code=\$(get_leader_http_code)
+
+# wait until the API returns a 200 
+while [ \$${leader_http_code} -ne 200 ]; do
+  echo "Waiting for HTTP 200 from http://127.0.0.1:4646/v1/status/leader"
+  echo "Sleeping for 5 seconds"
+  sleep 5
+  leader_http_code=\$(get_leader_http_code)
+done
+
+# get the local and leader ip addresses
+local_ipv4=\$(get_local_ipv4)
+leader_ipv4=\$(get_leader_ipv4)
+
+# if the local ip address matches the leaders then run acl bootstrap
+if [ "\$${local_ipv4}" = "\$${leader_ipv4}" ]; then
+  echo "Leader"
+  echo "Bootstrapping ACL system"
+  echo "Writing bootstrap output to /tmp/bootstrap_output"
+  nomad acl bootstrap > /tmp/bootstrap_output
+else
+  echo "Not leader"
+  echo "Skipping bootstrap"
+fi
+EOS
+  chmod 755 /usr/local/bin/nomad-bootstrap
+
+  # configure systemd for nomad-bootstrap
+  cat > /lib/systemd/system/nomad-bootstrap.service <<EOF
+[Unit]
+Description=nomad-bootstrap
+Requires=network-online.target
+After=network-online.target nomad-join.service
+[Service]
+ExecStart=/usr/local/bin/nomad-bootstrap
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  # start nomad-bootstrap
+  systemctl enable nomad-bootstrap
+  systemctl start nomad-bootstrap
+fi
