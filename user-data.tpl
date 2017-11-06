@@ -19,7 +19,7 @@ apt-get install unzip awscli jq --yes
 
 # install nomad
 app="nomad"
-version="0.7.0-beta1"
+version="0.7.0"
 zip="$${app}_$${version}_linux_amd64.zip"
 url="https://releases.hashicorp.com/$${app}/$${version}/$${zip}"
 config_dir="/etc/$${app}.d"
@@ -157,7 +157,26 @@ EOF
 systemctl enable nomad-join
 systemctl start nomad-join
 
-if [ "$${agent_type}" = "server" ]; then 
+if [ "$${agent_type}" = "server" ]; then
+  # create an anonymous policy for checking nomad status
+  cat > /tmp/payload.json <<EOF
+{
+    "Name": "anonymous",
+    "Description": "Allow read-only access for anonymous requests",
+    "Rules": "
+        namespace \"default\" {
+            policy = \"read\"
+        }
+        agent {
+            policy = \"read\"
+        }
+        node {
+            policy = \"read\"
+        }
+    "
+}
+EOF
+
   # install nomad-bootstrap
   cat > /usr/local/bin/nomad-bootstrap <<EOS
 #!/bin/bash
@@ -172,6 +191,12 @@ get_leader_ipv4() {
 
 get_local_ipv4() {
   curl -s http://169.254.169.254/latest/meta-data/local-ipv4
+}
+
+set_anonymous_policy() {
+  export NOMAD_TOKEN=\$(grep 'Secret' /tmp/bootstrap_output | awk {'print \$4'})
+  curl --request POST --data @/tmp/payload.json -H "X-Nomad-Token: \$NOMAD_TOKEN" \
+    http://127.0.0.1:4646/v1/acl/policy/anonymous
 }
 
 # get the HTTP response code from /v1/status/leader
@@ -195,6 +220,7 @@ if [ "\$${local_ipv4}" = "\$${leader_ipv4}" ]; then
   echo "Bootstrapping ACL system"
   echo "Writing bootstrap output to /tmp/bootstrap_output"
   nomad acl bootstrap > /tmp/bootstrap_output
+  set_anonymous_policy
 else
   echo "Not leader"
   echo "Skipping bootstrap"

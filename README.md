@@ -63,6 +63,8 @@ The following resources are created:
 
     `nomad init`
 
+    > You will need to comment/remove the service check (lines 246-256) in the example.nomad job file if you are not running Consul on the instances
+
 1. Run the Nomad job:
 
     `nomad run example.nomad`
@@ -83,6 +85,6 @@ The following resources are created:
 To destroy the resources provisioned in this example run:
 
 ```
-terraform plan -out=d.tfplan -destroy
+terraform plan -destroy -out=d.tfplan
 terraform apply d.tfplan
 ```
