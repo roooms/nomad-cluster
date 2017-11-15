@@ -7,6 +7,7 @@ agent_type="${agent_type}"
 
 # set the hostname
 hostnamectl set-hostname "$${new_hostname}"
+echo "127.0.1.1 $${new_hostname}" >> /etc/hosts
 
 # install docker on nomad clients
 if [ "$${agent_type}" = "client" ]; then
