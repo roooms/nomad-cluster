@@ -19,8 +19,8 @@ resource "aws_launch_configuration" "server" {
   key_name                    = "${var.ssh_key_name}"
 
   security_groups = [
-    "${aws_security_group.server.id}",
-    "${aws_security_group.client.id}",
+    "${aws_security_group.general.id}",
+    "${aws_security_group.nomad.id}",
   ]
 
   lifecycle {
@@ -37,4 +37,10 @@ resource "aws_autoscaling_group" "server" {
   desired_capacity     = "${var.server_instance_count}"
   default_cooldown     = 30
   force_delete         = true
+
+  tag {
+    key                 = "Name"
+    value               = "${var.cluster_name}-server"
+    propagate_at_launch = true
+  }
 }
